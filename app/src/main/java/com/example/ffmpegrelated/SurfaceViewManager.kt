@@ -40,6 +40,10 @@ class SurfaceViewManager : SurfaceHolder.Callback{
         mPath=p
     }
 
+    fun getPath(): String{
+        return mPath
+    }
+
     fun startVideo(){
         native_start_video(mSurfaceViewHolder.surface, mPath)
     }

@@ -10,6 +10,7 @@ extern "C" {
 #include <libavutil/imgutils.h>
 #include <libavutil/frame.h>
 #include <libavformat/avio.h>
+#include <libswresample/swresample.h>
 }
 
 extern "C" JNIEXPORT jstring JNICALL
@@ -115,6 +116,95 @@ Java_com_example_ffmpegrelated_SurfaceViewManager_native_1start_1video(
 
     }
 
+    env->ReleaseStringUTFChars(path_, path);
+
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_example_ffmpegrelated_MusicPlayService_playSound(
+        JNIEnv *env,
+        jobject instance, jstring path_) {
+
+    const char *path=env->GetStringUTFChars(path_, 0);
+
+    //init
+    avformat_network_init();
+    av_register_all();
+
+    //get context
+    AVFormatContext *formatContext=avformat_alloc_context();
+
+    //open input with video path and context
+    AVDictionary *opts=NULL;
+    av_dict_set(&opts, "time_out", "30000000000", 0);
+    int ret=avformat_open_input(&formatContext, path, NULL, NULL);
+
+    if(ret){
+        return;
+    }
+    //get stream info according to context
+    avformat_find_stream_info(formatContext, NULL);
+
+    int audio_stream_index=-1;
+    for(int i=0; i<formatContext->nb_streams; i++){
+        if(formatContext->streams[i]->codecpar->codec_type==AVMEDIA_TYPE_AUDIO){
+            audio_stream_index=i;
+            break;
+        }
+    }
+
+    //get video deco parameter according to video stream index
+    AVCodecParameters *dedecpar=formatContext->streams[audio_stream_index]->codecpar;
+
+    //get video decoder according to id
+    AVCodec *dec=avcodec_find_decoder(dedecpar->codec_id);
+
+    //get decoder context
+    AVCodecContext *codecContext=avcodec_alloc_context3(dec);
+
+    //bind context and parameter together
+    avcodec_parameters_to_context(codecContext, dedecpar);
+
+    //bind context and decoder together
+    avcodec_open2(codecContext, dec, NULL);
+
+    //set packet already for later use
+    AVPacket *packet=av_packet_alloc();
+
+    AVFrame *frame=av_frame_alloc();
+    SwrContext *swrContext=swr_alloc();
+    uint8_t *out_buffer=(uint8_t *)av_malloc(44100*2);
+    uint64_t out_ch_layout=AV_CH_LAYOUT_STEREO;
+    enum AVSampleFormat out_format=AV_SAMPLE_FMT_S16;
+    int out_sample_rate=codecContext->sample_rate;
+
+    swr_alloc_set_opts(swrContext, out_ch_layout, out_format, out_sample_rate,
+            codecContext->channel_layout, codecContext->sample_fmt, codecContext->sample_rate, 0, NULL);
+    swr_init(swrContext);
+    int out_channel_nb=av_get_channel_layout_nb_channels(AV_CH_LAYOUT_STEREO);
+    jclass music_player=env->GetObjectClass(instance);
+    jmethodID createTrack=env->GetMethodID(music_player, "createTrack", "(II)V");
+    env->CallVoidMethod(instance, createTrack, 44100, out_channel_nb);
+    jmethodID playTrack=env->GetMethodID(music_player, "playTrack", "([BI)V");
+    int got_frame;
+    while(av_read_frame(formatContext, packet)>=0){
+        if(packet->stream_index==audio_stream_index){
+            avcodec_decode_audio4(codecContext, frame, &got_frame, packet);
+            if(got_frame){
+                swr_convert(swrContext, &out_buffer, 44100*2, (const uint8_t **)frame->data, frame->nb_samples);
+                int size=av_samples_get_buffer_size(NULL, out_channel_nb, frame->nb_samples, AV_SAMPLE_FMT_S16, 1);
+                jbyteArray audio_sample_array=env->NewByteArray(size);
+                env->SetByteArrayRegion(audio_sample_array, 0, size, (const jbyte *)out_buffer);
+                env->CallVoidMethod(instance, playTrack, audio_sample_array, size);
+//                env->DeleteGlobalRef(audio_sample_array);
+            }
+        }
+    }
+
+    av_frame_free(&frame);
+    swr_free(&swrContext);
+    avcodec_close(codecContext);
+    avformat_close_input(&formatContext);
     env->ReleaseStringUTFChars(path_, path);
 
 }
