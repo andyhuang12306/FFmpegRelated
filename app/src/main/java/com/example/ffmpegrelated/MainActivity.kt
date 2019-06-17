@@ -32,10 +32,12 @@ class MainActivity : AppCompatActivity(), View.OnClickListener {
     private val permissionRequests: ArrayList<String> = arrayListOf()
 
     override fun onClick(v: View?) {
-        when (v?.id) {
-            R.id.tv_start -> mManager.startVideo()
-            R.id.tv_start_audio -> MusicPlayService().playSound(mManager.getPath())
-        }
+        MusicPlay().playSound(mManager.getPath())
+        mManager.startVideo()
+//        when (v?.id) {
+//            R.id.tv_start -> MusicPlay().playSound(mManager.getPath())
+//            R.id.tv_start_audio -> MusicPlay().stopSound(mManager.getPath())
+//        }
 
     }
 
