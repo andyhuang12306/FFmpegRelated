@@ -32,6 +32,7 @@ class MainActivity : AppCompatActivity(), View.OnClickListener {
     private val permissionRequests: ArrayList<String> = arrayListOf()
 
     override fun onClick(v: View?) {
+        System.loadLibrary("HQPlayer")
         MusicPlay().playSound(mManager.getPath())
         mManager.startVideo()
 //        when (v?.id) {

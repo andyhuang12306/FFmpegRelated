@@ -33,10 +33,4 @@ class MusicPlayService {
 
     external fun playSound(input: String)
 
-    companion object{
-        init {
-            System.loadLibrary("HQPlayer")
-        }
-    }
-
 }

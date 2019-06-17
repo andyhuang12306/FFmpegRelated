@@ -18,12 +18,6 @@ class SurfaceViewManager : SurfaceHolder.Callback{
 
     }
 
-    companion object {
-        init {
-            System.loadLibrary("HQPlayer")
-        }
-    }
-
     private lateinit var mSurfaceViewHolder: SurfaceHolder
     private lateinit var mPath: String
 
